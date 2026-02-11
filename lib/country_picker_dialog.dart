@@ -4,6 +4,13 @@ import 'package:flutter/material.dart' show Dialog, InputDecoration, TextStyle, 
 import 'package:flutter_intl_phone_field/countries.dart';
 import 'package:flutter_intl_phone_field/helpers.dart';
 
+/// Türkçe arayüz metinleri
+class _Strings {
+  static const String title = 'Ülke';
+  static const String done = 'Tamam';
+  static const String searchPlaceholder = 'Ülke ara';
+}
+
 class PickerDialogStyle {
   final Color? backgroundColor;
 
@@ -77,8 +84,12 @@ class CountryPickerDialog extends StatefulWidget {
 class _CountryPickerDialogState extends State<CountryPickerDialog> {
   late List<Country> _filteredCountries;
   late Country _selectedCountry;
+  int _selectedIndex = 0;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  late FixedExtentScrollController _scrollController;
+
+  static const double _itemExtent = 44.0;
 
   @override
   void initState() {
@@ -90,12 +101,23 @@ class _CountryPickerDialogState extends State<CountryPickerDialog> {
             .localizedName(widget.languageCode)
             .compareTo(b.localizedName(widget.languageCode)),
       );
+    _selectedIndex = _indexOfSelectedInFiltered();
+    _scrollController = FixedExtentScrollController(
+      initialItem: _selectedIndex,
+    );
+  }
+
+  int _indexOfSelectedInFiltered() {
+    final i = _filteredCountries
+        .indexWhere((c) => c.code == _selectedCountry.code);
+    return i < 0 ? 0 : i;
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -107,7 +129,26 @@ class _CountryPickerDialogState extends State<CountryPickerDialog> {
               .localizedName(widget.languageCode)
               .compareTo(b.localizedName(widget.languageCode)),
         );
+      _selectedIndex = _indexOfSelectedInFiltered();
+      if (_selectedIndex < _filteredCountries.length) {
+        _selectedCountry = _filteredCountries[_selectedIndex];
+      }
+      _scrollController.jumpToItem(_selectedIndex);
     });
+  }
+
+  void _onPickerSelected(int index) {
+    setState(() {
+      _selectedIndex = index;
+      if (index < _filteredCountries.length) {
+        _selectedCountry = _filteredCountries[index];
+      }
+    });
+  }
+
+  void _onDone() {
+    widget.onCountryChanged(_selectedCountry);
+    Navigator.of(context).pop();
   }
 
   Widget _buildPickerContent(BuildContext context) {
@@ -115,14 +156,14 @@ class _CountryPickerDialogState extends State<CountryPickerDialog> {
       borderRadius: BorderRadius.circular(14),
       child: Container(
         constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.7),
+            maxHeight: MediaQuery.of(context).size.height * 0.6),
         padding: widget.style?.padding ?? const EdgeInsets.all(0),
         color: widget.style?.backgroundColor ??
             CupertinoColors.systemBackground.resolveFrom(context),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            // Üst başlık çubuğu (Cupertino tarzı)
+            // Üst araç çubuğu (Cupertino tarzı)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
@@ -136,7 +177,7 @@ class _CountryPickerDialogState extends State<CountryPickerDialog> {
                   children: [
                     const SizedBox(width: 80),
                     Text(
-                      'Country',
+                      _Strings.title,
                       style: CupertinoTheme.of(context)
                           .textTheme
                           .navTitleTextStyle,
@@ -145,40 +186,90 @@ class _CountryPickerDialogState extends State<CountryPickerDialog> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       minimumSize: Size.zero,
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Done'),
+                      onPressed: _onDone,
+                      child: const Text(_Strings.done),
                     ),
                   ],
                 ),
               ),
             ),
-            // Ülke listesi (scroll)
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _filteredCountries.length,
-                itemBuilder: (ctx, index) =>
-                    _buildCountryTile(_filteredCountries[index]),
-              ),
-            ),
-            // Modalın altında sabit arama (Safari tarzı)
+            // Arama (Türkçe placeholder)
             Container(
               padding: widget.style?.searchFieldPadding ??
-                  const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemGroupedBackground
-                    .resolveFrom(context),
+                  const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              color: CupertinoColors.systemGroupedBackground
+                  .resolveFrom(context),
+              child: CupertinoSearchTextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                placeholder: widget.searchText.isNotEmpty
+                    ? widget.searchText
+                    : _Strings.searchPlaceholder,
+                onChanged: _onSearchChanged,
+                style: CupertinoTheme.of(context).textTheme.textStyle,
               ),
-              child: SafeArea(
-                top: false,
-                child: CupertinoSearchTextField(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  placeholder: widget.searchText,
-                  onChanged: _onSearchChanged,
-                  style: CupertinoTheme.of(context).textTheme.textStyle,
-                ),
-              ),
+            ),
+            // Tekerlek picker (CupertinoPicker)
+            Flexible(
+              child: _filteredCountries.isEmpty
+                  ? const Center(child: Text('Ülke bulunamadı'))
+                  : CupertinoPicker(
+                      scrollController: _scrollController,
+                      itemExtent: _itemExtent,
+                      selectionOverlay: const CupertinoPickerDefaultSelectionOverlay(),
+                      onSelectedItemChanged: _onPickerSelected,
+                      children: List.generate(
+                        _filteredCountries.length,
+                        (index) {
+                          final country = _filteredCountries[index];
+                          return Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (kIsWeb)
+                                  Image.asset(
+                                    'assets/flags/${country.code.toLowerCase()}.png',
+                                    package: 'flutter_intl_phone_field',
+                                    width: 28,
+                                    errorBuilder: (_, __, ___) =>
+                                        Text(country.flag, style: const TextStyle(fontSize: 20)),
+                                  )
+                                else
+                                  Text(
+                                    country.flag,
+                                    style: const TextStyle(fontSize: 20),
+                                  ),
+                                const SizedBox(width: 10),
+                                Flexible(
+                                  child: Text(
+                                    country.localizedName(widget.languageCode),
+                                    style: widget.style?.countryNameStyle ??
+                                        CupertinoTheme.of(context)
+                                            .textTheme
+                                            .textStyle
+                                            .copyWith(
+                                                fontWeight: FontWeight.w600),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '+${country.dialCode}',
+                                  style: widget.style?.countryCodeStyle ??
+                                      CupertinoTheme.of(context)
+                                          .textTheme
+                                          .textStyle
+                                          .copyWith(
+                                            fontWeight: FontWeight.w600,
+                                            color: CupertinoColors.activeBlue,
+                                          ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
             ),
           ],
         ),
@@ -208,48 +299,5 @@ class _CountryPickerDialogState extends State<CountryPickerDialog> {
           CupertinoColors.systemBackground.resolveFrom(context),
       child: _buildPickerContent(context),
     );
-  }
-
-  Widget _buildCountryTile(Country country) {
-    final isSelected = country.code == _selectedCountry.code;
-    return CupertinoListTile(
-      leading: kIsWeb
-          ? Image.asset(
-              'assets/flags/${country.code.toLowerCase()}.png',
-              package: 'flutter_intl_phone_field',
-              width: 32,
-            )
-          : Text(
-              country.flag,
-              style: const TextStyle(fontSize: 18),
-            ),
-      padding: widget.style?.listTilePadding ??
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      title: Text(
-        country.localizedName(widget.languageCode),
-        style: widget.style?.countryNameStyle ??
-            CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-      ),
-      trailing: Text(
-        '+${country.dialCode}',
-        style: widget.style?.countryCodeStyle ??
-            CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: CupertinoColors.activeBlue,
-                ),
-      ),
-      backgroundColor: isSelected
-          ? CupertinoColors.activeBlue.withValues(alpha: 0.15)
-          : null,
-      onTap: () => _selectCountry(country),
-    );
-  }
-
-  void _selectCountry(Country country) {
-    _selectedCountry = country;
-    widget.onCountryChanged(_selectedCountry);
-    Navigator.of(context).pop();
   }
 }
