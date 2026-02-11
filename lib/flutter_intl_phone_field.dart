@@ -242,6 +242,22 @@ class IntlPhoneField extends StatefulWidget {
   /// & pick dialog
   final PickerDialogStyle? pickerDialogStyle;
 
+  /// Custom country picker dialog/sheet.
+  ///
+  /// Eğer bu callback tanımlanırsa, paket kendi dialogunu veya bottom
+  /// sheet'ini açmak yerine bu fonksiyonu çağırır.
+  ///
+  /// - [context]: Geçerli `BuildContext`
+  /// - [selectedCountry]: Şu anda seçili olan ülke
+  /// - [countryList]: Tüm kullanılabilir ülkeler listesi
+  ///
+  /// Fonksiyon bir `Country` dönerse (null değilse) seçim olarak kabul edilir.
+  final Future<Country?> Function(
+    BuildContext context,
+    Country selectedCountry,
+    List<Country> countryList,
+  )? customCountryPicker;
+
   /// The margin of the country selector button.
   ///
   /// The amount of space to surround the country selector button.
@@ -338,6 +354,7 @@ class IntlPhoneField extends StatefulWidget {
     this.magnifierConfiguration,
     this.prefixIcon,
     this.dialogType = DialogType.showDialog,
+    this.customCountryPicker,
     this.maxLength,
     this.minLines,
     this.maxLines,
@@ -418,6 +435,21 @@ class _IntlPhoneFieldState extends State<IntlPhoneField> {
   }
 
   Future<void> _changeCountryDialog() async {
+    // Kullanıcı kendi picker'ını sağladıysa önce onu dene.
+    if (widget.customCountryPicker != null) {
+      final result = await widget.customCountryPicker!(
+        context,
+        _selectedCountry,
+        _countryList,
+      );
+      if (result != null) {
+        _selectedCountry = result;
+        widget.onCountryChanged?.call(result);
+      }
+      if (mounted) setState(() {});
+      return;
+    }
+
     filteredCountries = _countryList;
     await showDialog(
       context: context,
@@ -442,6 +474,21 @@ class _IntlPhoneFieldState extends State<IntlPhoneField> {
   }
 
   Future<void> _changeCountryModalBottomSheet() async {
+    // Kullanıcı kendi picker'ını sağladıysa önce onu dene.
+    if (widget.customCountryPicker != null) {
+      final result = await widget.customCountryPicker!(
+        context,
+        _selectedCountry,
+        _countryList,
+      );
+      if (result != null) {
+        _selectedCountry = result;
+        widget.onCountryChanged?.call(result);
+      }
+      if (mounted) setState(() {});
+      return;
+    }
+
     filteredCountries = _countryList;
     await showCupertinoModalPopup<void>(
       context: context,
