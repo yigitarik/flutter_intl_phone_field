@@ -2,6 +2,7 @@ library flutter_intl_phone_field;
 
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart' show showCupertinoModalPopup;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -442,10 +443,11 @@ class _IntlPhoneFieldState extends State<IntlPhoneField> {
 
   Future<void> _changeCountryModalBottomSheet() async {
     filteredCountries = _countryList;
-    await showModalBottomSheet(
+    await showCupertinoModalPopup<void>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (ctx, setState) => CountryPickerDialog(
+          showAsDialog: false,
           dialogPadding: EdgeInsets.zero,
           languageCode: widget.languageCode,
           style: widget.pickerDialogStyle,
